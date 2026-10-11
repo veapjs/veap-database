@@ -1,5 +1,5 @@
-import { DatabaseError } from "./errors";
-import type { Model } from "./model";
+import { DatabaseError } from "./errors.js";
+import type { Model } from "./model.js";
 
 export abstract class Factory<M extends Model = any> {
   private static get registry(): Map<any, any> {

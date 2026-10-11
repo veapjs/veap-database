@@ -1,8 +1,9 @@
 import type { Knex } from "knex";
-import { serializeForStorage } from "./casts";
-import { getKnex } from "./connection";
-import { DatabaseError } from "./errors";
-import type { Model } from "./model";
+import { serializeForStorage } from "./casts.js";
+import { getKnex } from "./connection.js";
+import { DatabaseError } from "./errors.js";
+import type { Model } from "./model.js";
+import { eagerLoadRelations } from "./relations/eager-loader.js";
 import {
   BelongsTo,
   BelongsToMany,
@@ -12,9 +13,9 @@ import {
   MorphMany,
   MorphOne,
   MorphToMany,
-} from "./relations";
-import { eagerLoadRelations } from "./relations/eager-loader";
-import { toCamelCase, toSnakeCase } from "./utils";
+} from "./relations/index.js";
+import type { PaginationResult } from "./types.js";
+import { toCamelCase, toSnakeCase } from "./utils.js";
 
 export class ModelQueryBuilder<M extends Model = any> {
   [key: string]: any;
@@ -67,6 +68,17 @@ export class ModelQueryBuilder<M extends Model = any> {
               return result === target || result === undefined
                 ? receiver
                 : result;
+            };
+          }
+
+          // 3. Delegate to Knex query builder if method exists (e.g. groupBy, having, distinct, joinRaw)
+          if (
+            target.knexBuilder &&
+            typeof (target.knexBuilder as any)[prop] === "function"
+          ) {
+            return (...args: any[]) => {
+              const result = (target.knexBuilder as any)[prop](...args);
+              return result === target.knexBuilder ? receiver : result;
             };
           }
         }
@@ -319,6 +331,35 @@ export class ModelQueryBuilder<M extends Model = any> {
 
   skip(count: number): this {
     return this.offset(count);
+  }
+
+  groupBy(...columns: any[]): this {
+    const converted = columns.map((col) =>
+      typeof col === "string" ? toSnakeCase(col) : col,
+    );
+    this.knexBuilder.groupBy(...converted);
+    return this;
+  }
+
+  having(column: any, operatorOrValue?: any, value?: any): this {
+    if (value === undefined) {
+      if (operatorOrValue === undefined) {
+        this.knexBuilder.having(column);
+      } else {
+        this.knexBuilder.having(column, "=", operatorOrValue);
+      }
+    } else {
+      this.knexBuilder.having(column, operatorOrValue, value);
+    }
+    return this;
+  }
+
+  distinct(...columns: any[]): this {
+    const converted = columns.map((col) =>
+      typeof col === "string" ? toSnakeCase(col) : col,
+    );
+    this.knexBuilder.distinct(...converted);
+    return this;
   }
 
   join(
@@ -797,13 +838,7 @@ export class ModelQueryBuilder<M extends Model = any> {
   async paginate(
     page = 1,
     perPage = 15,
-  ): Promise<{
-    data: M[];
-    total: number;
-    page: number;
-    perPage: number;
-    lastPage: number;
-  }> {
+  ): Promise<PaginationResult<M> & { page: number }> {
     this.applyGlobalScopes();
     const countBuilder = this.knexBuilder.clone().clearSelect().clearOrder();
 
@@ -818,6 +853,7 @@ export class ModelQueryBuilder<M extends Model = any> {
       data,
       total,
       page,
+      currentPage: page,
       perPage,
       lastPage,
     };
@@ -827,6 +863,7 @@ export class ModelQueryBuilder<M extends Model = any> {
    * Bulk updates matching records.
    */
   async update(attributes: Record<string, any>): Promise<number> {
+    this.applyGlobalScopes();
     const converted: Record<string, any> = {};
     const casts = this.modelClass?.casts || {};
     const knex = getKnex();

@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
-import { getKnex } from "../connection";
-import { debug, warn } from "../logger";
-import { Schema } from "./schema-builder";
+import { getKnex } from "../connection.js";
+import { debug, warn } from "../logger.js";
+import { Schema } from "./schema-builder.js";
 
 export interface Migration {
   name: string;
@@ -30,6 +30,24 @@ async function ensureMigrationsTable(knex = getKnex()) {
     }
   } catch (error) {
     warn("veap:migration", "Failed to ensure migrations table:", error);
+  }
+}
+
+async function acquireAdvisoryLockIfPostgres(
+  tx: any,
+  knex: any,
+): Promise<void> {
+  const clientName = knex?.client?.config?.client || "";
+  if (
+    typeof clientName === "string" &&
+    (clientName.includes("pg") || clientName.includes("postgres"))
+  ) {
+    const lockId = 123456;
+    try {
+      await tx.raw("SELECT pg_advisory_xact_lock(?)", [lockId]);
+    } catch (_e) {
+      debug("veap:migration", "Could not acquire advisory lock, continuing...");
+    }
   }
 }
 
@@ -75,13 +93,8 @@ export async function runMigrations(scope: string, migrations: Migration[]) {
   await ensureMigrationsTable(knex);
 
   await knex.transaction(async (tx: any) => {
-    // Acquire advisory lock (unique ID for migrations in Postgres)
-    const lockId = 123456;
-    try {
-      await tx.raw("SELECT pg_advisory_xact_lock(?)", [lockId]);
-    } catch (_e) {
-      debug("veap:migration", "Could not acquire advisory lock, continuing...");
-    }
+    // Acquire advisory lock only if running on PostgreSQL
+    await acquireAdvisoryLockIfPostgres(tx, knex);
 
     debug("veap:migration", `Running migrations for scope: ${scope}`);
 
@@ -161,13 +174,8 @@ export async function rollbackMigrations(
   await ensureMigrationsTable(knex);
 
   await knex.transaction(async (tx: any) => {
-    // Acquire advisory lock
-    const lockId = 123456;
-    try {
-      await tx.raw("SELECT pg_advisory_xact_lock(?)", [lockId]);
-    } catch (_e) {
-      debug("veap:migration", "Could not acquire advisory lock, continuing...");
-    }
+    // Acquire advisory lock only if running on PostgreSQL
+    await acquireAdvisoryLockIfPostgres(tx, knex);
 
     // 1. Get executed migrations for this scope ordered by batch desc
     const executed = await tx("migrations")

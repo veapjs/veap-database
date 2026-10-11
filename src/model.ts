@@ -1,11 +1,11 @@
 /** biome-ignore-all lint/correctness/noConstructorReturn: <ignore> */
 import crypto from "node:crypto";
-import { type CastType, castAttribute, serializeForStorage } from "./casts";
-import { getKnex } from "./connection";
-import { DatabaseError } from "./errors";
-import { getDatabaseEventDispatcher } from "./events";
-import { Factory } from "./factory";
-import { ModelQueryBuilder } from "./query-builder";
+import { type CastType, castAttribute, serializeForStorage } from "./casts.js";
+import { getKnex } from "./connection.js";
+import { DatabaseError } from "./errors.js";
+import { getDatabaseEventDispatcher } from "./events.js";
+import { Factory } from "./factory.js";
+import { ModelQueryBuilder } from "./query-builder.js";
 import {
   BelongsTo,
   BelongsToMany,
@@ -17,9 +17,9 @@ import {
   MorphOne,
   MorphTo,
   MorphToMany,
-} from "./relations";
-import type { GlobalScope } from "./scopes";
-import { toCamelCase, toSnakeCase } from "./utils";
+} from "./relations/index.js";
+import type { GlobalScope } from "./scopes.js";
+import { toCamelCase, toSnakeCase } from "./utils.js";
 
 export abstract class Model<
   Attributes extends Record<string, any> = Record<string, any>,
@@ -411,7 +411,7 @@ export abstract class Model<
    * Executes a database transaction.
    */
   static async transaction<T>(callback: (trx: any) => Promise<T>): Promise<T> {
-    const { transaction: runTrx } = await import("./connection");
+    const { transaction: runTrx } = await import("./connection.js");
     return await runTrx(callback);
   }
 
@@ -481,12 +481,15 @@ export abstract class Model<
    */
   static async destroy(this: typeof Model, id: any): Promise<boolean> {
     const knex = getKnex();
+    const clientType = knex.client?.config?.client;
     if ((this as any).softDeletes) {
       const col = toSnakeCase((this as any).deletedAtColumn || "deleted_at");
       const count = await knex(this.table)
         .where(this.primaryKey, id)
         .whereNull(col)
-        .update({ [col]: new Date() });
+        .update({
+          [col]: serializeForStorage(new Date(), "datetime", clientType),
+        });
       return count > 0;
     }
     const count = await knex(this.table).where(this.primaryKey, id).delete();
@@ -805,7 +808,20 @@ export abstract class Model<
         insertData[col] = serializeForStorage(v, castType, clientType);
       }
 
-      await knex(modelClass.table).insert(insertData);
+      const insertResult = await knex(modelClass.table)
+        .insert(insertData)
+        .returning(pk);
+
+      if (!this.getAttribute(pk)) {
+        if (Array.isArray(insertResult) && insertResult.length > 0) {
+          const first = insertResult[0];
+          const returnedId =
+            typeof first === "object" && first !== null ? first[pk] : first;
+          if (returnedId !== undefined && returnedId !== null) {
+            this.setAttribute(pk, returnedId);
+          }
+        }
+      }
 
       this.isNew = false;
       this._original = { ...this._attributes };

@@ -1,5 +1,5 @@
-import type { Model } from "./model";
-import type { ModelQueryBuilder } from "./query-builder";
+import type { Model } from "./model.js";
+import type { ModelQueryBuilder } from "./query-builder.js";
 
 /**
  * Callback function for applying a global scope.

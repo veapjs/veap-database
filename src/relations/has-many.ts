@@ -1,6 +1,6 @@
-import type { Model } from "../model";
-import type { ModelQueryBuilder } from "../query-builder";
-import { Relation } from "./relation";
+import type { Model } from "../model.js";
+import type { ModelQueryBuilder } from "../query-builder.js";
+import { Relation } from "./relation.js";
 
 export class HasMany<
   Parent extends Model = any,

@@ -78,7 +78,7 @@ export function serializeForStorage(
 
   switch (type) {
     case "json":
-      return JSON.stringify(value);
+      return typeof value === "string" ? value : JSON.stringify(value);
 
     case "boolean":
       if (clientType?.includes("sqlite")) {

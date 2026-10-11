@@ -1,5 +1,5 @@
-import { DatabaseError } from "../errors";
-import type { Model } from "../model";
+import { DatabaseError } from "../errors.js";
+import type { Model } from "../model.js";
 
 /**
  * Loads relations onto an array of model instances in bulk queries, avoiding N+1.
@@ -17,6 +17,7 @@ export async function eagerLoadRelations<M extends Model>(
   for (const rel of relations) {
     const parts = rel.split(".");
     const head = parts[0];
+    if (!head) continue;
     const tail = parts.slice(1).join(".");
 
     if (!tree[head]) {
@@ -27,7 +28,7 @@ export async function eagerLoadRelations<M extends Model>(
     }
   }
 
-  const sample = models[0];
+  const sample = models[0]!;
 
   for (const [relationName, nestedRels] of Object.entries(tree)) {
     // Resolve relation instance from model (handling cases where loaded relation data shadows the method)

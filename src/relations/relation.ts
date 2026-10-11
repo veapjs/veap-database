@@ -1,5 +1,5 @@
-import type { Model } from "../model";
-import type { ModelQueryBuilder } from "../query-builder";
+import type { Model } from "../model.js";
+import type { ModelQueryBuilder } from "../query-builder.js";
 
 export abstract class Relation<
   Parent extends Model = any,

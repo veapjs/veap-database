@@ -1,8 +1,8 @@
-import { DatabaseError } from "../errors";
-import type { Model } from "../model";
-import type { ModelQueryBuilder } from "../query-builder";
-import { MorphMap } from "./morph-map";
-import { Relation } from "./relation";
+import { DatabaseError } from "../errors.js";
+import type { Model } from "../model.js";
+import type { ModelQueryBuilder } from "../query-builder.js";
+import { MorphMap } from "./morph-map.js";
+import { Relation } from "./relation.js";
 
 export class MorphTo<
   Child extends Model = any,

@@ -1,5 +1,5 @@
-import { transaction } from "./connection";
-import { debug, info, warn } from "./logger";
+import { transaction } from "./connection.js";
+import { debug, info, warn } from "./logger.js";
 
 export type SeederClass = new () => Seeder;
 

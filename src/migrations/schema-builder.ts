@@ -1,4 +1,4 @@
-import { getKnex } from "../connection";
+import { getKnex } from "../connection.js";
 
 /**
  * Lightweight SQL helper for migrations, compatible with sql`...` template strings.

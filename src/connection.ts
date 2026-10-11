@@ -2,14 +2,14 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import fs from "node:fs";
 import path from "node:path";
 import knex, { type Knex } from "knex";
-import { DatabaseError } from "./errors";
-import { debug, warn } from "./logger";
+import { DatabaseError } from "./errors.js";
+import { debug, warn } from "./logger.js";
 import type {
   DatabaseConfig,
   PostgresSslConfig,
   PostgresSslOptions,
   TransactionOptions,
-} from "./types";
+} from "./types.js";
 
 const globalForDb = globalThis as any;
 
@@ -125,9 +125,13 @@ export function resolveSqliteFilename(filename: string): string {
 
   if (!clean.startsWith(":memory:")) {
     try {
-      fs.mkdirSync(path.dirname(path.resolve(clean)), {
-        recursive: true,
-      });
+      if (typeof process !== "undefined" && process.versions?.node) {
+        /* turbopackIgnore: true */
+        const resolvedPath = path.resolve(clean);
+        fs.mkdirSync(path.dirname(resolvedPath), {
+          recursive: true,
+        });
+      }
     } catch {
       // Read-only filesystem etc. Let the driver surface its own error.
     }

@@ -1,8 +1,8 @@
-import { getKnex } from "../connection";
-import type { Model } from "../model";
-import type { ModelQueryBuilder } from "../query-builder";
-import { MorphMap } from "./morph-map";
-import { Relation } from "./relation";
+import { getKnex } from "../connection.js";
+import type { Model } from "../model.js";
+import type { ModelQueryBuilder } from "../query-builder.js";
+import { MorphMap } from "./morph-map.js";
+import { Relation } from "./relation.js";
 
 /**
  * MorphToMany represents a many-to-many polymorphic relation where the parent

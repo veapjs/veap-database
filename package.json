@@ -1,6 +1,6 @@
 {
   "name": "@veap/database",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Eloquent-like Active Record ORM powered by Knex with AsyncLocalStorage transactions",
   "bugs": "https://github.com/veapjs/veap-database/issues",
   "repository": {
@@ -16,6 +16,14 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./migrations": {
+      "types": "./dist/migrations/index.d.ts",
+      "default": "./dist/migrations/index.js"
+    },
+    "./relations": {
+      "types": "./dist/relations/index.d.ts",
+      "default": "./dist/relations/index.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [
@@ -28,7 +36,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@veap/kernel": "^0.1.0",
+    "@veap/kernel": "^0.1.1",
     "better-sqlite3": "^13.0.3",
     "knex": "^3.3.0"
   },

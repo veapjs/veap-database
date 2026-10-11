@@ -1,14 +1,17 @@
-import { ConfigService, DATABASE, ServiceProvider } from "@veap/kernel";
+import { ConfigService, ServiceProvider } from "@veap/kernel";
 import knex, { type Knex } from "knex";
 import {
+  getKnex,
   initDatabase,
   isSqliteDatabase,
   resolvePostgresSslConfig,
   resolveSqliteFilename,
   setKnex,
-} from "./connection";
-import { debug } from "./logger";
-import type { DatabaseConfig } from "./types";
+} from "./connection.js";
+import { setDatabaseEventDispatcher } from "./events.js";
+import { debug, setDatabaseLogger } from "./logger.js";
+import { DATABASE } from "./tokens.js";
+import type { DatabaseConfig } from "./types.js";
 
 export interface DatabaseProviderConfig {
   databaseUrl?: string;
@@ -28,16 +31,62 @@ export class DatabaseServiceProvider extends ServiceProvider {
   }
 
   async boot(): Promise<void> {
-    const configService = await this.container.resolve(ConfigService);
+    let configService: any = null;
+    if (this.container.has(ConfigService)) {
+      configService = await this.container.resolve(ConfigService);
+    } else if (this.container.has("ConfigService")) {
+      configService = await this.container.resolve("ConfigService");
+    }
+
     const databaseUrl =
       this.config?.databaseUrl ||
-      configService.get("DATABASE_URL") ||
+      configService?.get?.("DATABASE_URL") ||
       process.env.DATABASE_URL ||
       process.env.DATABASE_FILE;
 
     const isProd =
-      configService.get("NODE_ENV") === "production" ||
+      configService?.get?.("NODE_ENV") === "production" ||
       process.env.NODE_ENV === "production";
+
+    // Auto-wire EventDispatcher if bound to container
+    if (this.container.has("EventDispatcher")) {
+      try {
+        const dispatcher = (await this.container.resolve(
+          "EventDispatcher",
+        )) as any;
+        if (dispatcher && typeof dispatcher.publish === "function") {
+          setDatabaseEventDispatcher(dispatcher);
+        }
+      } catch {
+        // Continue without event dispatcher
+      }
+    }
+
+    // Auto-wire Logger if bound to container
+    if (this.container.has("LOGGER")) {
+      try {
+        const logger = (await this.container.resolve("LOGGER")) as any;
+        if (logger && typeof logger.info === "function") {
+          setDatabaseLogger({
+            debug: (ch, msg, ...args) =>
+              logger.debug
+                ? logger.debug(`[${ch}] ${msg}`, ...args)
+                : undefined,
+            info: (ch, msg, ...args) => logger.info(`[${ch}] ${msg}`, ...args),
+            warn: (ch, msg, ...args) =>
+              logger.warn
+                ? logger.warn(`[${ch}] ${msg}`, ...args)
+                : console.warn(`[${ch}] ${msg}`, ...args),
+            error: (ch, msg, ...args) =>
+              logger.error
+                ? logger.error(`[${ch}] ${msg}`, ...args)
+                : console.error(`[${ch}] ${msg}`, ...args),
+          });
+        }
+      } catch {
+        // Continue with default logger
+      }
+    }
 
     if (this.config?.config) {
       const instance = initDatabase(this.config.config);
@@ -58,10 +107,10 @@ export class DatabaseServiceProvider extends ServiceProvider {
     const ssl = resolvePostgresSslConfig({
       databaseUrl: resolvedUrl,
       isProd,
-      rejectUnauthorizedEnv: configService.get(
+      rejectUnauthorizedEnv: configService?.get?.(
         "DATABASE_SSL_REJECT_UNAUTHORIZED",
       ),
-      caCert: configService.get("DATABASE_SSL_CA"),
+      caCert: configService?.get?.("DATABASE_SSL_CA"),
     });
 
     const instance = knex({
@@ -85,5 +134,16 @@ export class DatabaseServiceProvider extends ServiceProvider {
       token: "Knex",
       useValue: instance,
     });
+  }
+
+  async shutdown(): Promise<void> {
+    try {
+      const k = getKnex();
+      if (k && typeof k.destroy === "function") {
+        await k.destroy();
+      }
+    } catch {
+      // Ignore if not initialized
+    }
   }
 }
