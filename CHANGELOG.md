@@ -1,11 +1,17 @@
 # @veap/database
 
+## 0.1.3
+
+### Patch Changes
+- Updated dependencies []:
+  - @veap/kernel@0.1.3
+
 ## 0.1.2
 
 ### Patch Changes
 
 - Register the full migration cycle with the `veap` console, and stop migrating the database behind a command's back.
-  
+
   - `MigrationServiceProvider.commands()` contributes `make:migration`, `migrate`, `migrate:status` and `migrate:rollback`, so a host application that calls `.withMigrations(appMigrations)` gets the whole cycle.
   - `migrate` and `migrate:rollback` go through the console's confirmation gate: silent outside production, a `confirm()` in production, `--force` for an unattended run and `--no-interaction` resolving the prompt to "no" instead of hanging.
   - `make:migration {name} {--dir=path}` writes the migration into the project the console runs in, rejects a name that is not a plain identifier, refuses to overwrite an existing file, and regenerates the directory's `index.ts` for both `export default { … }` and named `up`/`down` modules — so hand-written migrations survive a regeneration.
@@ -14,14 +20,14 @@
   - `rollbackMigrations()` undoes a batch in the reverse of the applied order (`batch desc`, then `executed_at desc`), which is what the code always claimed to do.
   - `MigrationServiceProvider.boot()` skips its automatic migration under the console (`VEAP_CLI=1`): `veap list` must not touch the database, and applying migrations belongs to `veap migrate`.
 - Updated dependencies []:
-  - @veap/kernel@0.1.4
+  - @veap/kernel@0.1.2
 
 ## 0.1.1
 
 ### Patch Changes
 
 - Fix native Node.js ESM module resolution, global scopes in bulk updates, auto-increment primary keys, define DATABASE and APP_MIGRATIONS tokens, augment ApplicationBuilder with withMigrations, and add comprehensive ORM test coverage:
-  
+
   - Define and export `DATABASE` (`Token<Knex>`) and `APP_MIGRATIONS` (`Token<any[]>`) IoC tokens within `@veap/database` (`src/tokens.ts`, `src/index.ts`), decoupling them from `@veap/kernel`.
   - Augment `ApplicationBuilder` from `@veap/kernel` via TypeScript Module Augmentation with `.withMigrations(migrations: any[])` and configure `MigrationsConfigProvider` and `MigrationServiceProvider`.
   - Update `MigrationServiceProvider` to register and resolve `APP_MIGRATIONS`.

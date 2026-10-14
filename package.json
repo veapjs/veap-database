@@ -1,6 +1,6 @@
 {
   "name": "@veap/database",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Eloquent-like Active Record ORM powered by Knex with AsyncLocalStorage transactions",
   "bugs": "https://github.com/veapjs/veap-database/issues",
   "repository": {
