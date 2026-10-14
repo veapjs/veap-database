@@ -34,6 +34,64 @@ jobs:
           node-version: 22
           registry-url: "https://registry.npmjs.org"
 
+      - name: Wait for Veap dependencies on npm
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TIMEOUT=1200
+          INTERVAL=15
+          START=$(date +%s)
+
+          # Download runtime dependencies starting with @veap/
+          DEPS=$(node -e '
+            const p = require("./package.json");
+            const deps = {
+              ...p.dependencies,
+              ...p.optionalDependencies
+            };
+
+            for (const [name, version] of Object.entries(deps)) {
+              if (name.startsWith("@veap/")) {
+                console.log(`${name}\t${version}`);
+              }
+            }
+          ')
+
+          if [ -z "$DEPS" ]; then
+            echo "No Veap dependencies to wait for."
+            exit 0
+          fi
+
+          while IFS=$'\t' read -r NAME RANGE; do
+            [ -z "$NAME" ] && continue
+
+            # Workspace versions must be replaced with npm versions.
+            if [[ "$RANGE" == workspace:* ]]; then
+              echo "::error::$NAME uses $RANGE. Replace workspace: with an npm version before release."
+              exit 1
+            fi
+
+            echo "Waiting for $NAME@$RANGE..."
+
+            until npm view "$NAME@$RANGE" version \
+              --json >/dev/null 2>&1; do
+
+              NOW=$(date +%s)
+              ELAPSED=$((NOW - START))
+
+              if [ "$ELAPSED" -ge "$TIMEOUT" ]; then
+                echo "::error::Timeout waiting for $NAME@$RANGE"
+                exit 1
+              fi
+
+              echo "$NAME@$RANGE is not available yet. Retrying in ${INTERVAL}s..."
+              sleep "$INTERVAL"
+            done
+
+            echo "$NAME@$RANGE is available on npm."
+          done <<< "$DEPS"
+
       - name: Install dependencies
         run: bun install
 
