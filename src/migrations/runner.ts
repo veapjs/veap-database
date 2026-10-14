@@ -9,6 +9,21 @@ export interface Migration {
   down?: (db: any, schema: Schema) => Promise<void>;
 }
 
+/**
+ * What one `runMigrations()` call actually did.
+ *
+ * Returned instead of a bare `void` so a caller — `veap migrate` above all —
+ * can report the run instead of guessing: an empty `ran` means nothing was
+ * pending, and `batch` is only set when migrations were applied.
+ */
+export interface MigrationRunResult {
+  scope: string;
+  /** Names of the migrations applied by this call, in execution order. */
+  ran: string[];
+  /** Batch the migrations of this call were recorded under. */
+  batch?: number;
+}
+
 async function ensureMigrationsTable(knex = getKnex()) {
   try {
     const hasTable = await knex.schema.hasTable("migrations");
@@ -79,16 +94,21 @@ function createMigrationDbAdapter(trx: any) {
   });
 }
 
-export async function runMigrations(scope: string, migrations: Migration[]) {
-  if (migrations.length === 0) return;
+export async function runMigrations(
+  scope: string,
+  migrations: Migration[],
+): Promise<MigrationRunResult> {
+  let result: MigrationRunResult = { scope, ran: [] };
+
+  if (migrations.length === 0) return result;
 
   let knex: any;
   try {
     knex = getKnex();
   } catch {
-    return;
+    return result;
   }
-  if (!knex) return;
+  if (!knex) return result;
 
   await ensureMigrationsTable(knex);
 
@@ -150,7 +170,25 @@ export async function runMigrations(scope: string, migrations: Migration[]) {
         throw error; // Rollback the whole batch on error
       }
     }
+
+    // Reported only once the whole batch is in: an error above rolls the
+    // transaction back, so nothing was applied and `ran` stays empty.
+    result = { scope, ran: pending.map((migration) => migration.name), batch };
   });
+
+  return result;
+}
+
+/**
+ * What one `rollbackMigrations()` call actually undid.
+ *
+ * Mirrors {@link MigrationRunResult} so `veap migrate:rollback` can report the
+ * reversed migrations instead of claiming a rollback that never happened.
+ */
+export interface MigrationRollbackResult {
+  scope: string;
+  /** Names of the migrations rolled back, in the order their `down()` ran. */
+  rolledBack: string[];
 }
 
 /**
@@ -160,16 +198,18 @@ export async function runMigrations(scope: string, migrations: Migration[]) {
 export async function rollbackMigrations(
   scope: string,
   migrations: Migration[],
-) {
-  if (migrations.length === 0) return;
+): Promise<MigrationRollbackResult> {
+  let result: MigrationRollbackResult = { scope, rolledBack: [] };
+
+  if (migrations.length === 0) return result;
 
   let knex: any;
   try {
     knex = getKnex();
   } catch {
-    return;
+    return result;
   }
-  if (!knex) return;
+  if (!knex) return result;
 
   await ensureMigrationsTable(knex);
 
@@ -177,11 +217,15 @@ export async function rollbackMigrations(
     // Acquire advisory lock only if running on PostgreSQL
     await acquireAdvisoryLockIfPostgres(tx, knex);
 
-    // 1. Get executed migrations for this scope ordered by batch desc
+    // 1. The last batch first, and inside it the most recently executed
+    // migration first: a rollback has to walk the batch backwards, otherwise a
+    // table added to an existing one would be dropped before its own foreign
+    // keys, or after a table that depends on it.
     const executed = await tx("migrations")
-      .select("name", "batch")
+      .select("name", "batch", "executed_at")
       .where("scope", scope)
-      .orderBy("batch", "desc");
+      .orderBy("batch", "desc")
+      .orderBy("executed_at", "desc");
 
     if (executed.length === 0) {
       debug("veap:migration", `No migrations to rollback for ${scope}.`);
@@ -196,8 +240,8 @@ export async function rollbackMigrations(
 
     const dbAdapter = createMigrationDbAdapter(tx);
     const schema = new Schema(tx);
+    const rolledBack: string[] = [];
 
-    // Rollback in reverse order
     for (const name of toRollbackNames) {
       const migration = migrations.find((m) => m.name === name);
       if (migration && migration.down) {
@@ -211,6 +255,7 @@ export async function rollbackMigrations(
             .where("name", name)
             .where("scope", scope)
             .delete();
+          rolledBack.push(name);
           debug("veap:migration", `[${scope}] Rolled back ${name}.`);
         } catch (error) {
           warn(
@@ -222,5 +267,11 @@ export async function rollbackMigrations(
         }
       }
     }
+
+    // Only reported once the transaction committed: an error above rolls it
+    // back, so nothing was undone.
+    result = { scope, rolledBack };
   });
+
+  return result;
 }
