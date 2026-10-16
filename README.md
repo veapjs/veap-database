@@ -53,23 +53,22 @@ npm install @veap/database better-sqlite3
 Create models extending the base `Model` class:
 
 ```ts
-import { Model, belongsTo, hasMany } from "@veap/database";
-import type { BelongsTo, HasMany } from "@veap/database";
+import { Model, type BelongsTo, type HasMany } from "@veap/database";
 
 export class Author extends Model {
-  static override tableName = "authors";
+  static override table = "authors";
 
   declare id: string;
   declare name: string;
   declare email: string;
 
   public posts(): HasMany<Post> {
-    return hasMany(this, Post, "author_id");
+    return this.hasMany(Post, "author_id");
   }
 }
 
 export class Post extends Model {
-  static override tableName = "posts";
+  static override table = "posts";
 
   declare id: string;
   declare title: string;
@@ -77,7 +76,7 @@ export class Post extends Model {
   declare author_id: string;
 
   public author(): BelongsTo<Author> {
-    return belongsTo(this, Author, "author_id");
+    return this.belongsTo(Author, "author_id");
   }
 }
 ```
@@ -161,9 +160,11 @@ export const app = Application.configure()
 
 ## Subpath Exports
 
-| Export Path      | Content                                                                 |
-| ---------------- | ----------------------------------------------------------------------- |
-| `@veap/database` | Core ORM, Model, relations, transactions, schema builder, and providers |
+| Export Path                 | Content                                                                 |
+| --------------------------- | ----------------------------------------------------------------------- |
+| `@veap/database`            | Core ORM, Model, relations, transactions, schema builder, and providers |
+| `@veap/database/migrations` | Migration runner, `Schema` builder, and migration types                 |
+| `@veap/database/relations`  | Relation classes (`BelongsTo`, `HasMany`, `MorphMany`, `MorphToMany`)   |
 
 ## Documentation
 
