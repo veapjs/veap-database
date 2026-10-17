@@ -1,5 +1,12 @@
 # @veap/database
 
+## 0.1.7
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @veap/kernel@0.2.0
+
 ## 0.1.6
 
 ### Patch Changes
