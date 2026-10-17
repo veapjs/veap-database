@@ -1,4 +1,9 @@
-import { ConfigService, ServiceProvider } from "@veap/kernel";
+import {
+  ConfigService,
+  EVENT_BUS,
+  LOGGER,
+  ServiceProvider,
+} from "@veap/kernel";
 import knex, { type Knex } from "knex";
 import {
   getKnex,
@@ -48,12 +53,16 @@ export class DatabaseServiceProvider extends ServiceProvider {
       configService?.get?.("NODE_ENV") === "production" ||
       process.env.NODE_ENV === "production";
 
-    // Auto-wire EventDispatcher if bound to container
-    if (this.container.has("EventDispatcher")) {
+    // Auto-wire EventDispatcher / EventBus if bound to container
+    const eventBusToken = this.container.has(EVENT_BUS)
+      ? EVENT_BUS
+      : this.container.has("EventDispatcher")
+        ? "EventDispatcher"
+        : null;
+
+    if (eventBusToken) {
       try {
-        const dispatcher = (await this.container.resolve(
-          "EventDispatcher",
-        )) as any;
+        const dispatcher = (await this.container.resolve(eventBusToken)) as any;
         if (dispatcher && typeof dispatcher.publish === "function") {
           setDatabaseEventDispatcher(dispatcher);
         }
@@ -63,9 +72,15 @@ export class DatabaseServiceProvider extends ServiceProvider {
     }
 
     // Auto-wire Logger if bound to container
-    if (this.container.has("LOGGER")) {
+    const loggerToken = this.container.has(LOGGER)
+      ? LOGGER
+      : this.container.has("LOGGER")
+        ? "LOGGER"
+        : null;
+
+    if (loggerToken) {
       try {
-        const logger = (await this.container.resolve("LOGGER")) as any;
+        const logger = (await this.container.resolve(loggerToken)) as any;
         if (logger && typeof logger.info === "function") {
           setDatabaseLogger({
             debug: (ch, msg, ...args) =>

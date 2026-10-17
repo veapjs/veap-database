@@ -1,5 +1,15 @@
 # @veap/database
 
+## 0.1.8
+
+### Patch Changes
+
+- Fix canonical logger token resolution in `@veap/database`:
+  
+  - **Logger Token**: Updated `DatabaseServiceProvider` to resolve logger via the canonical `LOGGER` token from `@veap/kernel` rather than raw symbol strings.
+- Updated dependencies [`a7f6a1f`]:
+  - @veap/kernel@0.2.1
+
 ## 0.1.7
 
 ### Patch Changes
